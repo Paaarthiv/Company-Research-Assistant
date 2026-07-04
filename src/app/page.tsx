@@ -199,6 +199,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(report),
       });
+      if (!res.ok) throw new Error("PDF generation failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -208,6 +209,8 @@ export default function Home() {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+    } catch {
+      setMessages((prev) => [...prev, { id: uid(), role: "error", text: "PDF generation failed. Please try again." }]);
     } finally {
       updateMsg(msgId, (m) => (m.role === "report" ? { ...m, downloading: false } : m));
     }

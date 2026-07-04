@@ -32,7 +32,31 @@ const SKIP_PATTERNS = [
   "#", "javascript:",
 ];
 
+// SSRF guard: only crawl public http(s) hosts — never loopback, private ranges,
+// link-local (cloud metadata), or bare IP-less internal names.
+export function isSafePublicUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+    const host = u.hostname.toLowerCase();
+    if (!host.includes(".")) return false; // localhost, intranet single-label names
+    if (host === "0.0.0.0" || host.endsWith(".local") || host.endsWith(".internal")) return false;
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      const [a, b] = host.split(".").map(Number);
+      if (a === 127 || a === 10 || a === 0) return false;
+      if (a === 172 && b >= 16 && b <= 31) return false;
+      if (a === 192 && b === 168) return false;
+      if (a === 169 && b === 254) return false; // cloud metadata
+    }
+    if (host.startsWith("[") || host === "::1") return false; // IPv6 literals
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function fetchWithTimeout(url: string, timeout = PAGE_TIMEOUT_MS): Promise<string | null> {
+  if (!isSafePublicUrl(url)) return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
@@ -135,7 +159,9 @@ export async function crawlSite(
     if (!href) return;
     let abs: string;
     try {
-      abs = new URL(href, base).toString();
+      const u = new URL(href, base);
+      u.hash = ""; // fragment-only variants are the same page
+      abs = u.toString();
     } catch {
       return;
     }

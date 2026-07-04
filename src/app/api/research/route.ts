@@ -11,7 +11,7 @@ import {
   normalizeUrl,
   isUrl,
 } from "@/lib/serper";
-import { crawlSite } from "@/lib/crawler";
+import { crawlSite, isSafePublicUrl } from "@/lib/crawler";
 import { analyzeCompany } from "@/lib/openrouter";
 import type { ApiKeys, CompanyReport, ResearchEvent } from "@/lib/types";
 
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const body = (await req.json()) as Body;
   const { openrouter, serper } = resolveKeys(body.keys);
   const model = body.model?.trim() || "google/gemini-2.5-flash";
-  const input = (body.input ?? "").trim();
+  const input = (body.input ?? "").trim().slice(0, 200);
 
   const encoder = new TextEncoder();
 
@@ -55,6 +55,9 @@ export async function POST(req: NextRequest) {
         const serperContextParts: string[] = [];
         if (inputIsUrl) {
           website = normalizeUrl(input);
+          if (!isSafePublicUrl(website)) {
+            throw new Error("That URL points to a private or unsupported address. Please enter a public company website.");
+          }
           stage("resolve", `Using ${website}`, "done");
         } else {
           stage("resolve", `Finding official website for "${input}"`, "active");

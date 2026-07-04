@@ -5,6 +5,7 @@ import { sendReportToDiscord } from "@/lib/discord";
 import type { CompanyReport, ApplicantInfo, DiscordConfig } from "@/lib/types";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 interface Body {
   report: CompanyReport;
